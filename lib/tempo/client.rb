@@ -117,7 +117,7 @@ module Tempo
 
       res = Net::HTTP.start(uri.hostname, uri.port, use_ssl: true) { |http| http.request(req) }
       unless res.is_a?(Net::HTTPSuccess)
-        abort "Jira API error: #{res.code} - #{res.message}\n#{res.body}"
+        abort_with_jira_api_error(response: res)
       end
       JSON.parse(res.body)
     end
@@ -130,7 +130,7 @@ module Tempo
 
       res = Net::HTTP.start(uri.hostname, uri.port, use_ssl: true) { |http| http.request(req) }
       unless res.is_a?(Net::HTTPSuccess)
-        abort "Jira API error: #{res.code} - #{res.message}\n#{res.body}"
+        abort_with_jira_api_error(response: res)
       end
       JSON.parse(res.body)
     end
@@ -143,7 +143,7 @@ module Tempo
 
       res = Net::HTTP.start(uri.hostname, uri.port, use_ssl: true) { |http| http.request(req) }
       unless res.is_a?(Net::HTTPSuccess)
-        abort "Tempo API error: #{res.code} - #{res.message}\n#{res.body}"
+        abort_with_tempo_api_error(response: res)
       end
       JSON.parse(res.body)
     end
@@ -157,7 +157,7 @@ module Tempo
 
       res = Net::HTTP.start(uri.hostname, uri.port, use_ssl: true) { |http| http.request(req) }
       unless res.is_a?(Net::HTTPSuccess)
-        abort "Tempo API error: #{res.code} - #{res.message}\n#{res.body}"
+        abort_with_tempo_api_error(response: res)
       end
       JSON.parse(res.body)
     end
@@ -171,7 +171,7 @@ module Tempo
 
       res = Net::HTTP.start(uri.hostname, uri.port, use_ssl: true) { |http| http.request(req) }
       unless res.is_a?(Net::HTTPSuccess)
-        abort "Tempo API error: #{res.code} - #{res.message}\n#{res.body}"
+        abort_with_tempo_api_error(response: res)
       end
       JSON.parse(res.body)
     end
@@ -183,9 +183,27 @@ module Tempo
 
       res = Net::HTTP.start(uri.hostname, uri.port, use_ssl: true) { |http| http.request(req) }
       unless res.is_a?(Net::HTTPSuccess)
-        abort "Tempo API error: #{res.code} - #{res.message}\n#{res.body}"
+        abort_with_tempo_api_error(response: res)
       end
       true
+    end
+
+    ATLASSIAN_API_TOKENS_URL = 'https://id.atlassian.com/manage-profile/security/api-tokens'
+
+    # A 401 from Jira means it rejected JIRA_EMAIL and JIRA_API_TOKEN, and an expired token is the usual reason; any other failure is reported as Jira returned it.
+    def abort_with_jira_api_error(response:)
+      if response.code == '401'
+        abort "Jira rejected the credentials in JIRA_EMAIL and JIRA_API_TOKEN. Atlassian API tokens expire: create a new one at #{ATLASSIAN_API_TOKENS_URL} and update JIRA_API_TOKEN."
+      end
+      abort "Jira API error: #{response.code} - #{response.message}\n#{response.body}"
+    end
+
+    # A 401 from Tempo means it rejected TEMPO_API_TOKEN; any other failure is reported as Tempo returned it.
+    def abort_with_tempo_api_error(response:)
+      if response.code == '401'
+        abort 'Tempo rejected TEMPO_API_TOKEN. Generate a new one in Tempo > Settings > API Integration and update TEMPO_API_TOKEN.'
+      end
+      abort "Tempo API error: #{response.code} - #{response.message}\n#{response.body}"
     end
   end
 end

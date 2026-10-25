@@ -33,10 +33,19 @@ module Tempo
       current_user['accountId']
     end
 
+    TEMPO_LARGEST_ALLOWED_PAGE_SIZE = 5000
+
+    # Returns every worklog the current user logged from one date to another, reading each page Tempo splits them into.
+    # Each worklog is a hash as Tempo returns it, e.g. { 'tempoWorklogId' => 215848, 'startDate' => '2026-09-10', 'timeSpentSeconds' => 27360, ... }.
     def worklogs(from:, to: from)
-      data = tempo_get("/worklogs?from=#{from}&to=#{to}")
-      all = data['results'] || data
-      all.select { |log| log.dig('author', 'accountId') == current_account_id }
+      current_user_worklogs = []
+      next_page_url = "#{TEMPO_BASE_URL}/worklogs/user/#{current_account_id}?from=#{from}&to=#{to}&limit=#{TEMPO_LARGEST_ALLOWED_PAGE_SIZE}"
+      while next_page_url
+        worklogs_page = tempo_get_from_url(next_page_url)
+        current_user_worklogs.concat(worklogs_page['results'])
+        next_page_url = worklogs_page.dig('metadata', 'next')
+      end
+      current_user_worklogs
     end
 
     def create_worklog(issue_id:, time_spent_seconds:, start_date:, start_time: nil, description: nil, author_account_id: nil, billable_seconds: nil)
@@ -136,7 +145,11 @@ module Tempo
     end
 
     def tempo_get(path)
-      uri = URI("#{TEMPO_BASE_URL}#{path}")
+      tempo_get_from_url("#{TEMPO_BASE_URL}#{path}")
+    end
+
+    def tempo_get_from_url(url)
+      uri = URI(url)
       req = Net::HTTP::Get.new(uri)
       req['Authorization'] = "Bearer #{@tempo_token}"
       req['Accept'] = 'application/json'
